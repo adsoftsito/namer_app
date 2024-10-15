@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'blog_row.dart';
+import 'dart:convert';
+
+
+import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:rflutter_alert/rflutter_alert.dart';
 
 final HttpLink httpLink = HttpLink("https://mysite-hdva.onrender.com/graphql/");
 //final HttpLink httpLink = HttpLink("http://localhost:8000/graphql/");
@@ -68,13 +75,41 @@ class MyAppState extends ChangeNotifier {
 
   GlobalKey? historyListKey;
 
-  void getNext() {
-    history.insert(0, current);
-    var animatedList = historyListKey?.currentState as AnimatedListState?;
-    animatedList?.insertItem(0);
-    current = WordPair.random();
-    notifyListeners();
-  }
+  final url = Uri.parse("https://fastapi-ml-latest.onrender.com/score");
+  final headers = {"Content-Type": "application/json;charset=UTF-8"};
+
+  void callModel() async {
+        print('hello model...');
+        try {
+        final prediction_instance = {
+         "age": 64,
+         "sex": 1,
+         "cp": 3,
+         "trestbps": 120,
+         "chol": 267,
+         "fbs": 0,
+         "restecg": 0,
+        "thalach": 99,
+        "exang": 1,
+        "oldpeak": 1.8,
+        "slope": 1,
+        "ca": 2,
+        "thal": 2
+      };
+
+      final res = await http.post(url, headers: headers, body: jsonEncode(prediction_instance));
+    
+      if (res.statusCode == 200) {
+        final json_prediction = (res.body);
+                 print(  json_prediction);
+      }
+      else {
+        print('error');
+      }
+    } catch (e) {
+      print(e.toString());
+    }
+ }
 
   var favorites = <WordPair>[];
 
@@ -113,7 +148,9 @@ class _MyHomePageState extends State<MyHomePage> {
       case 1:
         page = FavoritesPage();
       case 2:
-        page = LogsPage();
+        page = ModelPage();
+      case 3:
+        page = RetrainPage();
 
       default:
         throw UnimplementedError('no widget for $selectedIndex');
@@ -152,8 +189,13 @@ class _MyHomePageState extends State<MyHomePage> {
                         label: 'Favorites',
                       ),
                       BottomNavigationBarItem(
-                        icon: Icon(Icons.abc_sharp),
-                        label: 'Logs',
+                        icon: Icon(Icons.heart_broken),
+                        label: 'Model',
+                      ),
+                      
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.add_box),
+                        label: 'Retrain',
                       ),
          
                     ],
@@ -183,8 +225,13 @@ class _MyHomePageState extends State<MyHomePage> {
                         label: Text('Favorites'),
                       ),
                       NavigationRailDestination(
-                        icon: Icon(Icons.abc_sharp),
-                        label: Text('Logs'),
+                        icon: Icon(Icons.heart_broken),
+                        label: Text('Model'),
+                      ),
+                      
+                      NavigationRailDestination(
+                        icon: Icon(Icons.add_box),
+                        label: Text('Retrain'),
                       ),
                       
                     ],
@@ -206,6 +253,8 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
+
+
 
 class GeneratorPage extends StatelessWidget {
   @override
@@ -239,14 +288,14 @@ class GeneratorPage extends StatelessWidget {
                   appState.toggleFavorite();
                 },
                 icon: Icon(icon),
-                label: Text('Like'),
+                label: Text('I Like'),
               ),
               SizedBox(width: 10),
               ElevatedButton(
                 onPressed: () {
-                  appState.getNext();
+                  //appState.getNext();
                 },
-                child: Text('Next'),
+                child: Text('The Next'),
               ),
             ],
           ),
@@ -348,6 +397,114 @@ class FavoritesPage extends StatelessWidget {
       ],
     );
   }
+}
+
+class ModelPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<MyAppState>();
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+            TextField(
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+              hintText: 'Enter v1',
+            ),
+          ),
+           Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  appState.callModel();
+                },
+                child: Text('Predict'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+} 
+
+class RetrainPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<MyAppState>();
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+            TextField(
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+              hintText: 'dataset Url',
+            ),
+          ),
+           Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  appState.callModel();
+                },
+                child: Text('Retrain Model'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+} 
+
+ @override
+  Widget build(BuildContext context) {
+    var theme = Theme.of(context);
+    var appState = context.watch<MyAppState>();
+
+    if (appState.favorites.isEmpty) {
+      return Center(
+        child: Text('No favorites yet.'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          // Make better use of wide windows with a grid.
+          child: GridView(
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 400,
+              childAspectRatio: 400 / 80,
+            ),
+            children: [
+              for (var pair in appState.favorites)
+                ListTile(
+                  leading: IconButton(
+                    icon: Icon(Icons.delete_outline, semanticLabel: 'Delete'),
+                    color: theme.colorScheme.primary,
+                    onPressed: () {
+                      appState.removeFavorite(pair);
+                    },
+                  ),
+                  title: Text(
+                    pair.asLowerCase,
+                    semanticsLabel: pair.asPascalCase,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+
+
 }
 
 class LogsPage extends StatelessWidget {
